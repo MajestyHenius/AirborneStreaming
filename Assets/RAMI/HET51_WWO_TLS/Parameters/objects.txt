@@ -1,0 +1,14 @@
+ACERCA_wood ACERCA_wood_Group.obj ACERCAbranch - 0x006400ff False -999.0 - -999.0
+CORYAV_wood CORYAV_wood_Group.obj CORYAVbranch - 0x006400ff False -999.0 - -999.0
+QUERRO_foliage QUERRO_foliage_Group.obj QUERROfoliage - 0x006400ff False -999.0 - -999.0
+ACERCA_foliage ACERCA_foliage_Group.obj ACERCAfoliage - 0x006400ff False -999.0 - -999.0
+CRATMO_foliage CRATMO_foliage_Group.obj CRATMOfoliage - 0x006400ff False -999.0 - -999.0
+CRATMO_wood CRATMO_wood_Group.obj CRATMObranch - 0x006400ff False -999.0 - -999.0
+FRAXEX_foliage FRAXEX_foliage_Group.obj FRAXEXfoliage - 0x006400ff False -999.0 - -999.0
+QUERRO_wood QUERRO_wood_Group.obj QUERRObranch - 0x006400ff False -999.0 - -999.0
+ACERPS_foliage ACERPS_foliage_Group.obj ACERPSfoliage - 0x006400ff False -999.0 - -999.0
+NA_foliage NA_foliage_Group.obj NAfoliage - 0x006400ff False -999.0 - -999.0
+FRAXEX_wood FRAXEX_wood_Group.obj FRAXEXbranch - 0x006400ff False -999.0 - -999.0
+ACERPS_wood ACERPS_wood_Group.obj ACERPSbranch - 0x006400ff False -999.0 - -999.0
+NA_wood NA_wood_Group.obj NAbranch - 0x006400ff False -999.0 - -999.0
+CORYAV_foliage CORYAV_foliage_Group.obj CORYAVfoliage - 0x006400ff False -999.0 - -999.0

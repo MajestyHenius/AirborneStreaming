@@ -1,0 +1,36 @@
+2021-10-16 20:39:46 INFO  main [lessrt.cpp:378] Parsing scene description from "D:\ZK\RAMI\simulation\new\HET51_WWO_TLS\Parameters\_scenefile\main.xml" ..
+2021-10-16 20:39:46 WARN  main [scenehandler.cpp:797] In file "D:\ZK\RAMI\simulation\new\HET51_WWO_TLS\Parameters\_scenefile\main.xml" (near line 15): Unqueried attribute "wavelengths" in element "integrator"
+2021-10-16 20:39:47 INFO  main [scenehandler.cpp:677] In file "D:\ZK\RAMI\simulation\new\HET51_WWO_TLS\Parameters\_scenefile\main.xml" (near line 41): Parsing included file "terrain.xml" ..
+2021-10-16 20:39:47 INFO  main [scenehandler.cpp:677] In file "D:\ZK\RAMI\simulation\new\HET51_WWO_TLS\Parameters\_scenefile\main.xml" (near line 42): Parsing included file "object.xml" ..
+2021-10-16 20:39:47 INFO  main [SerializedMesh] Loading shape 0 from "ACERCA_wood_Group.serialized" ..
+2021-10-16 20:39:47 INFO  main [KDTreeBase] Constructing a SAH kd-tree (41600 primitives) ..
+2021-10-16 20:39:48 INFO  main [KDTreeBase] Finished -- took 1269 ms.
+2021-10-16 20:39:48 INFO  main [SerializedMesh] Loading shape 0 from "CORYAV_wood_Group.serialized" ..
+2021-10-16 20:39:48 INFO  main [KDTreeBase] Constructing a SAH kd-tree (1050960 primitives) ..
+2021-10-16 20:39:53 INFO  main [KDTreeBase] Finished -- took 5373 ms.
+2021-10-16 20:39:54 INFO  main [SerializedMesh] Loading shape 0 from "QUERRO_foliage_Group.serialized" ..
+2021-10-16 20:39:54 INFO  main [KDTreeBase] Constructing a SAH kd-tree (741658 primitives) ..
+2021-10-16 20:39:57 INFO  main [KDTreeBase] Finished -- took 3252 ms.
+2021-10-16 20:39:58 INFO  main [SerializedMesh] Loading shape 0 from "ACERCA_foliage_Group.serialized" ..
+2021-10-16 20:39:58 INFO  main [KDTreeBase] Constructing a SAH kd-tree (7270 primitives) ..
+2021-10-16 20:39:58 INFO  main [KDTreeBase] Finished -- took 97 ms.
+2021-10-16 20:39:58 INFO  main [SerializedMesh] Loading shape 0 from "CRATMO_foliage_Group.serialized" ..
+2021-10-16 20:39:58 INFO  main [KDTreeBase] Constructing a SAH kd-tree (103278 primitives) ..
+2021-10-16 20:39:59 INFO  main [KDTreeBase] Finished -- took 1186 ms.
+2021-10-16 20:39:59 INFO  main [SerializedMesh] Loading shape 0 from "CRATMO_wood_Group.serialized" ..
+2021-10-16 20:39:59 INFO  main [KDTreeBase] Constructing a SAH kd-tree (606420 primitives) ..
+2021-10-16 20:40:03 INFO  main [KDTreeBase] Finished -- took 3489 ms.
+2021-10-16 20:40:03 INFO  main [SerializedMesh] Loading shape 0 from "FRAXEX_foliage_Group.serialized" ..
+2021-10-16 20:40:03 INFO  main [KDTreeBase] Constructing a SAH kd-tree (715286 primitives) ..
+2021-10-16 20:40:06 INFO  main [KDTreeBase] Finished -- took 2888 ms.
+2021-10-16 20:40:06 INFO  main [SerializedMesh] Loading shape 0 from "QUERRO_wood_Group.serialized" ..
+2021-10-16 20:40:07 INFO  main [KDTreeBase] Constructing a SAH kd-tree (4064880 primitives) ..
+2021-10-16 20:40:26 INFO  main [KDTreeBase] Finished -- took 19448 ms.
+2021-10-16 20:40:29 INFO  main [SerializedMesh] Loading shape 0 from "ACERPS_foliage_Group.serialized" ..
+2021-10-16 20:40:30 INFO  main [KDTreeBase] Constructing a SAH kd-tree (4525466 primitives) ..
+2021-10-16 20:40:48 INFO  main [KDTreeBase] Finished -- took 18924 ms.
+2021-10-16 20:40:50 INFO  main [SerializedMesh] Loading shape 0 from "NA_foliage_Group.serialized" ..
+2021-10-16 20:40:50 INFO  main [KDTreeBase] Constructing a SAH kd-tree (66674 primitives) ..
+2021-10-16 20:40:51 INFO  main [KDTreeBase] Finished -- took 869 ms.
+2021-10-16 20:40:51 INFO  main [SerializedMesh] Loading shape 0 from "FRAXEX_wood_Group.serialized" ..
+2021-10-16 20:40:52 INFO  main [KDTreeBase] Constructing a SAH kd-tree (3731080 primitives) ..

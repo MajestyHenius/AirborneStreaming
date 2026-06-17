@@ -1,0 +1,16 @@
+ACERCA_wood -40.0 200.0 0.0 0.0
+ACERCA_foliage -40.0 200.0 0.0 0.0
+CRATMO_foliage -40.0 200.0 0.0 0.0
+CRATMO_wood -40.0 200.0 0.0 0.0
+NA_foliage -40.0 200.0 0.0 0.0
+NA_wood -40.0 200.0 0.0 0.0
+CORYAV_wood -40.0 200.0 0.0 0.0
+CORYAV_foliage -40.0 200.0 0.0 0.0
+ACERCA_wood -30.0 210.0 0.0 0.0
+ACERCA_foliage -30.0 210.0 0.0 0.0
+CRATMO_foliage -50.0 210.0 0.0 0.0
+CRATMO_wood -50.0 210.0 0.0 0.0
+NA_foliage -30.0 190.0 0.0 0.0
+NA_wood -30.0 190.0 0.0 0.0
+CORYAV_wood -50.0 190.0 0.0 0.0
+CORYAV_foliage -50.0 190.0 0.0 0.0

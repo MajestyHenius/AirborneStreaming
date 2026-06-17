@@ -1,0 +1,35 @@
+2021-11-03 21:21:19 INFO  main [lessrt.cpp:378] Parsing scene description from "E:\master2\RAMI\simulation\actual\HET09_JBS_SUM\Parameters\_scenefile\main.xml" ..
+2021-11-03 21:21:19 WARN  main [scenehandler.cpp:797] In file "E:\master2\RAMI\simulation\actual\HET09_JBS_SUM\Parameters\_scenefile\main.xml" (near line 14): Unqueried attribute "wavelengths" in element "integrator"
+2021-11-03 21:21:19 WARN  main [scenehandler.cpp:797] In file "E:\master2\RAMI\simulation\actual\HET09_JBS_SUM\Parameters\_scenefile\main.xml" (near line 36): Unqueried attribute "farClip" in element "sensor"
+2021-11-03 21:21:19 WARN  main [scenehandler.cpp:797] In file "E:\master2\RAMI\simulation\actual\HET09_JBS_SUM\Parameters\_scenefile\main.xml" (near line 36): Unqueried attribute "nearClip" in element "sensor"
+2021-11-03 21:21:19 INFO  main [scenehandler.cpp:677] In file "E:\master2\RAMI\simulation\actual\HET09_JBS_SUM\Parameters\_scenefile\main.xml" (near line 41): Parsing included file "terrain.xml" ..
+2021-11-03 21:21:19 INFO  main [scenehandler.cpp:677] In file "E:\master2\RAMI\simulation\actual\HET09_JBS_SUM\Parameters\_scenefile\main.xml" (near line 42): Parsing included file "object.xml" ..
+2021-11-03 21:21:19 INFO  main [SerializedMesh] Loading shape 0 from "TICO5_foliage_Group.serialized" ..
+2021-11-03 21:21:19 INFO  main [KDTreeBase] Constructing a SAH kd-tree (262650 primitives) ..
+2021-11-03 21:21:22 INFO  main [KDTreeBase] Finished -- took 3126 ms.
+2021-11-03 21:21:22 INFO  main [SerializedMesh] Loading shape 0 from "ACPL_twig_Group.serialized" ..
+2021-11-03 21:21:23 INFO  main [KDTreeBase] Constructing a SAH kd-tree (29440 primitives) ..
+2021-11-03 21:21:24 INFO  main [KDTreeBase] Finished -- took 945 ms.
+2021-11-03 21:21:24 INFO  main [SerializedMesh] Loading shape 0 from "ALGL3_twig_Group.serialized" ..
+2021-11-03 21:21:24 INFO  main [KDTreeBase] Constructing a SAH kd-tree (596240 primitives) ..
+2021-11-03 21:21:34 INFO  main [KDTreeBase] Finished -- took 9646 ms.
+2021-11-03 21:21:34 INFO  main [SerializedMesh] Loading shape 0 from "TICO1_branch_Group.serialized" ..
+2021-11-03 21:21:34 INFO  main [KDTreeBase] Constructing a SAH kd-tree (20924 primitives) ..
+2021-11-03 21:21:35 INFO  main [KDTreeBase] Finished -- took 1065 ms.
+2021-11-03 21:21:35 INFO  main [SerializedMesh] Loading shape 0 from "TICO2_branch_Group.serialized" ..
+2021-11-03 21:21:35 INFO  main [KDTreeBase] Constructing a SAH kd-tree (53458 primitives) ..
+2021-11-03 21:21:37 INFO  main [KDTreeBase] Finished -- took 2235 ms.
+2021-11-03 21:21:38 INFO  main [SerializedMesh] Loading shape 0 from "POTR2_foliage_Group.serialized" ..
+2021-11-03 21:21:40 INFO  main [KDTreeBase] Constructing a SAH kd-tree (1067472 primitives) ..
+2021-11-03 21:21:55 INFO  main [KDTreeBase] Finished -- took 15267 ms.
+2021-11-03 21:21:56 INFO  main [SerializedMesh] Loading shape 0 from "FREX_foliage_Group.serialized" ..
+2021-11-03 21:21:56 INFO  main [KDTreeBase] Constructing a SAH kd-tree (75834 primitives) ..
+2021-11-03 21:21:58 INFO  main [KDTreeBase] Finished -- took 1682 ms.
+2021-11-03 21:21:58 INFO  main [SerializedMesh] Loading shape 0 from "BEPE3_stem_Group.serialized" ..
+2021-11-03 21:21:58 INFO  main [KDTreeBase] Constructing a SAH kd-tree (1962 primitives) ..
+2021-11-03 21:21:58 INFO  main [KDTreeBase] Finished -- took 38 ms.
+2021-11-03 21:21:58 INFO  main [SerializedMesh] Loading shape 0 from "TICO3_foliage_Group.serialized" ..
+2021-11-03 21:21:58 INFO  main [KDTreeBase] Constructing a SAH kd-tree (78570 primitives) ..
+2021-11-03 21:21:59 INFO  main [KDTreeBase] Finished -- took 1450 ms.
+2021-11-03 21:21:59 INFO  main [SerializedMesh] Loading shape 0 from "PIAB_foliage_Group.serialized" ..
+2021-11-03 21:22:02 INFO  main [KDTreeBase] Constructing a SAH kd-tree (7170000 primitives) ..
