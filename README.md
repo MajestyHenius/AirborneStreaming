@@ -42,7 +42,7 @@ Unlike offline simulators that buffer everything and save after the mission, thi
 
 ## 🌲 3. Scene Setup (RAMI / LESS terrain)
 
-Scenes are built from **RAMI / LESS** forest reconstructions (e.g. `HET09_JBS_SUM`) from https://lessrt.org/res_html/rami.html and
+Scenes are built from **RAMI / LESS** forest reconstructions (e.g. `HET09_JBS_SUM`) by Qi et al. from https://lessrt.org/res_html/rami.html and
 prepared for raycast-only scanning. Both are Editor tools.
 
 | Script                  | Role                                                         | Entry point                                            |
