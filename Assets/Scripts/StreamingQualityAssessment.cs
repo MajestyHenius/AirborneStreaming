@@ -8,74 +8,85 @@ using System;
 public class StreamingQualityAssessment : MonoBehaviour
 {
 
-    public string CurrentPhase = "cruise";   // SPattern Ã¿Ö¡¸üĞÂ
-    [Header("ÖÊÁ¿ÆÀ¹À²ÎÊı")]
-    public int WindowSize = 50; // »¬¶¯´°¿Ú´óĞ¡£¨É¨ÃèÏßÊı£©
-    // --- perf instrumentation (additive) ---
+    public string CurrentPhase = "cruise";   // SPattern æ¯å¸§æ›´æ–°
+    [Header("è´¨é‡è¯„ä¼°å‚æ•°")]
+    public int WindowSize = 50; // æ»‘åŠ¨çª—å£å¤§å°ï¼ˆæ‰«æçº¿æ•°ï¼‰
+    [SerializeField] private bool logAlertsToConsole = true;   // false: alerts go to the CSV only (no Editor console echo)
+    // --- Performance instrumentation ---
     private long metricTicksThisSweep = 0;
     private long lastSweepMetricTicks = 0;
-    public int CalculationStep = 10; // Ã¿10ÌõÉ¨ÃèÏß¼ÆËãÒ»´Î
-    public float PDVRThreshold = 0.1f; // PDVRãĞÖµ
-    public float ISCThreshold = 0.15f; // ISCãĞÖµ  
-    public float CCIThreshold = 0.6f; // CCIãĞÖµ
+    public int CalculationStep = 10; // æ¯10æ¡æ‰«æçº¿è®¡ç®—ä¸€æ¬¡
+    public float PDVRThreshold = 0.1f; // PDVRé˜ˆå€¼
+    public float ISCThreshold = 0.15f; // ISCé˜ˆå€¼
+    public float CCIThreshold = 0.6f; // CCIé˜ˆå€¼
 
 
-    [Header("¼¸ºÎ²ÎÊı£¨Óë SPatternScanFlight Ò»ÖÂ£©")]
-    public float MaxScanAngleFromNadir = 75f;   // ÓëÖ÷³ÌĞòÍ¬Ãû×Ö¶Î±£³ÖÒ»ÖÂ
+    [Header("å‡ ä½•å‚æ•°ï¼ˆä¸ SPatternScanFlight ä¸€è‡´ï¼‰")]
+    public float MaxScanAngleFromNadir = 89f;   // ä¸ä¸»ç¨‹åºåŒåå­—æ®µä¿æŒä¸€è‡´
 
-    // === O(1) ÔöÁ¿¸üĞÂ×´Ì¬ ===
+    // === O(1) å¢é‡æ›´æ–°çŠ¶æ€ ===
     private float prevDensity = -1f;
     private Vector3 prevPosition;
     private bool hasPrevScan = false;
 
-    // PDVR£º¹ö¶¯ r_i ĞòÁĞ + ÀÛ¼ÓºÍ
+    // PDVRï¼šæ»šåŠ¨ r_i åºåˆ— + ç´¯åŠ å’Œ
     private Queue<float> rHistory = new Queue<float>();
     private double pdvrSum = 0.0;
 
-    // ISC£º¹ö¶¯ d_i ĞòÁĞ + Ò»½×/¶ş½×ÀÛ¼Ó
+    // ISCï¼šæ»šåŠ¨ d_i åºåˆ— + ä¸€é˜¶/äºŒé˜¶ç´¯åŠ 
     private Queue<float> dHistory = new Queue<float>();
     private double sumD = 0.0, sumD2 = 0.0;
 
-    // CCI£º¹ö¶¯ per-scan CCI + ÀÛ¼Ó
+    // CCIï¼šæ»šåŠ¨ per-scan CCI + ç´¯åŠ 
     private Queue<float> cciHistory = new Queue<float>();
     private double sumCCI = 0.0;
 
 
 
     // === Sweep-level accumulator (per ground-facing half-revolution) ===
-    //public float MaxScanAngleFromNadir = 75f;   // ¦Õ_max in degrees
+    //public float MaxScanAngleFromNadir = 89f;   // Ï†_max in degrees
 
-    // µ±Ç° sweep µÄÀÛ»ı×´Ì¬
-    private int curSweepValidHits = 0;          // n_i^pts (ÂÛÎÄ Eq.13)
+    // å½“å‰ sweep çš„ç´¯ç§¯çŠ¶æ€
+    private int curSweepValidHits = 0;          // n_i^pts (è®ºæ–‡ Eq.13)
     private int lastPi = 0;
     private float lastRhoI = 0f;
-    private int curSweepTotalRays = 0;          // ÓÃÓÚ CCI µÄ n_total
-    //private List<float> curSweepCrossTrackPos = new List<float>();  // ÓÃÓÚ CCI ºáÏò·Öbin
-    [Header("CCI ²ÎÊı (Â·Ïß B)")]
+    private int curSweepTotalRays = 0;          // ç”¨äº CCI çš„ n_total
+    //private List<float> curSweepCrossTrackPos = new List<float>();  // ç”¨äº CCI æ¨ªå‘åˆ†bin
+    [Header("CCI bins")]
     public int CCIBinCount = 4;            // Q
-    public int CCIMinBinFirings = 2;       // ¦Ó: active-bin ×îĞ¡ firing Êı
+    public int CCIMinBinFirings = 2;       // Ï„: active-bin æœ€å° firing æ•°
     private int[] curSweepNTotal;          // n_total[k]
     private int[] curSweepNValid;          // n_valid[k]
     private float[] curSweepExpected;     // E[k]: expected pts per bin (tan-projection geometry)
 
+    [Header("CCI with independent expected counts")]
+    public bool useAbsoluteExpectation = true;   // true: expected counts from firing geometry only, independent of returns
+    public float MaxDetectionDistance = 100f;      // must match the flight script
+    public float VerticalFOVDeg = 30f;             // along-track fan angle, must match the flight script
+    [Header("CCI validation: injected coverage gaps (off: 0 / -1)")]
+    public float testDropoutFraction = 0f;         // drop this fraction of expected returns uniformly
+    public int testDropBin = -1;                   // drop every return in this cross-track bin
+    public int testSeed = 1;
+    private System.Random testRng;
 
-    private Vector3 curSweepFirstFiringPos;     // sweep Æğµã
-    private Vector3 curSweepLastFiringPos;      // sweep ÖÕµã
-    private float curSweepAltitude = 50f;       // ÓÃÓÚ w_i = 2h tan(¦Õ_max)
-    private bool inGroundFacingHalf = false;    // µ±Ç°ÊÇ·ñÔÚ³¯µØ°ëÈ¦
+
+    private Vector3 curSweepFirstFiringPos;     // sweep èµ·ç‚¹
+    private Vector3 curSweepLastFiringPos;      // sweep ç»ˆç‚¹
+    private float curSweepAltitude = 50f;       // ç”¨äº w_i = 2h tan(Ï†_max)
+    private bool inGroundFacingHalf = false;    // å½“å‰æ˜¯å¦åœ¨æœåœ°åŠåœˆ
     private bool prevInGroundFacingHalf = false;
 
-    // ÉÏÒ»¸öÒÑ commit µÄ sweep ĞÅÏ¢£¨ÓÃÓÚ¼ÆËã d_i, r_i£©
+    // ä¸Šä¸€ä¸ªå·² commit çš„ sweep ä¿¡æ¯ï¼ˆç”¨äºè®¡ç®— d_i, r_iï¼‰
     private Vector3 prevSweepCentroid;
     private float prevSweepDensity = -1f;
     private bool hasPrevSweep = false;
 
-    // sweep ¼ÆÊı£¨¶ÀÁ¢ÓÚ scanCounter£¬scanCounter ÈÔÊÇ firing ¼ÆÊı¼æÈİ¾É½Ó¿Ú£©
+    // sweep è®¡æ•°ï¼ˆç‹¬ç«‹äº scanCounterï¼ŒscanCounter ä»æ˜¯ firing è®¡æ•°å…¼å®¹æ—§æ¥å£ï¼‰
     private int sweepCounter = 0;
 
 
 
-    // Êı¾İ½á¹¹
+    // æ•°æ®ç»“æ„
     private Queue<ScanLineData> slidingWindow = new Queue<ScanLineData>();
     private List<QualityMetrics> metricsHistory = new List<QualityMetrics>();
     private StreamWriter metricsWriter;   // streaming CSV writer (no in-memory accumulation)
@@ -87,7 +98,7 @@ public class StreamingQualityAssessment : MonoBehaviour
     private int scanCounter = 0;
     private string sessionId;
 
-    // É¨ÃèÏßÊı¾İ½á¹¹
+    // æ‰«æçº¿æ•°æ®ç»“æ„
     private class ScanLineData
     {
         public int scanIndex;
@@ -108,7 +119,7 @@ public class StreamingQualityAssessment : MonoBehaviour
         }
     }
 
-    // ÖÊÁ¿Ö¸±ê½á¹¹
+    // è´¨é‡æŒ‡æ ‡ç»“æ„
     private class QualityMetrics
     {
         public int scanIndex;
@@ -134,13 +145,25 @@ public class StreamingQualityAssessment : MonoBehaviour
 
 
 
-    public void OnFiring(List<float> ranges, Vector3 position, float omega)
+    [Header("Revision 2 timing (off by default)")]
+    public bool enableSweepTiming = false;
+    private SweepTimingRecorder sweepTiming;
+
+    public void OnFiring(List<float> ranges, Vector3 position, float omega,
+        double firingSimTime = double.NaN, long firingWallTick = 0)
     {
         long _t0 = System.Diagnostics.Stopwatch.GetTimestamp();
         float omegaMax = MaxScanAngleFromNadir * Mathf.Deg2Rad;
         inGroundFacingHalf = Mathf.Abs(omega) <= omegaMax;
 
-        // 1. ½øÈë³¯µØ°ëÈ¦£º¿ªĞÂ sweep
+        bool traceTiming = enableSweepTiming && !double.IsNaN(firingSimTime) && firingWallTick > 0;
+        if (traceTiming && sweepTiming == null)
+            sweepTiming = new SweepTimingRecorder();
+        if (traceTiming && inGroundFacingHalf && !prevInGroundFacingHalf)
+            sweepTiming.Begin(firingSimTime, firingWallTick);
+        bool traceCommit = traceTiming && !inGroundFacingHalf && prevInGroundFacingHalf;
+
+        // 1. è¿›å…¥æœåœ°åŠåœˆï¼šå¼€æ–° sweep
         if (inGroundFacingHalf && !prevInGroundFacingHalf)
         {
             curSweepValidHits = 0;
@@ -161,35 +184,53 @@ public class StreamingQualityAssessment : MonoBehaviour
             curSweepAltitude = Mathf.Max(0.1f, position.y);
         }
 
-        // 2. ÔÚ³¯µØ°ëÈ¦ÖĞ£º°´ bin ÀÛ»ı n_total / n_valid
+        // 2. åœ¨æœåœ°åŠåœˆä¸­ï¼šæŒ‰ bin ç´¯ç§¯ n_total / n_valid
         if (inGroundFacingHalf)
         {
-            // cross-track bin ÓÃ sweep-locked altitude µÄ¹Ì¶¨ extent (Q3 ¾ö¶¨: ²»×ÔÊÊÓ¦)
-            float swathHalf = curSweepAltitude * Mathf.Tan(omegaMax);
-            if (swathHalf > 1e-6f)
+            // cross-track bin ç”¨ sweep-locked altitude çš„å›ºå®š extent
+            if (!useAbsoluteExpectation)
             {
-                float crossTrackPos = curSweepAltitude * Mathf.Tan(omega);
-                int binIdx = Mathf.Clamp(
-                    Mathf.FloorToInt((crossTrackPos + swathHalf) / (2f * swathHalf) * CCIBinCount),
-                    0, CCIBinCount - 1);
-                int nRays = ranges.Count;
-                curSweepTotalRays += nRays;
+                float swathHalf = curSweepAltitude * Mathf.Tan(omegaMax);
+                if (swathHalf > 1e-6f)
+                {
+                    float crossTrackPos = curSweepAltitude * Mathf.Tan(omega);
+                    int binIdx = Mathf.Clamp(
+                        Mathf.FloorToInt((crossTrackPos + swathHalf) / (2f * swathHalf) * CCIBinCount),
+                        0, CCIBinCount - 1);
+                    int nRays = ranges.Count;
+                    curSweepTotalRays += nRays;
+                    foreach (var r in ranges)
+                        if (r > 0f && r < float.MaxValue) { curSweepNValid[binIdx]++; curSweepValidHits++; }
+                    // E[bin]: expected geometric weight, tan-projection density 1/(1+(y/h)^2)
+                    float yk = crossTrackPos; float h = curSweepAltitude;
+                    float wGeom = 1f / (1f + (yk * yk) / (h * h));
+                    curSweepExpected[binIdx] += wGeom * nRays;
+                }
+            }
+            else
+            {
+                int nRaysAbs = ranges.Count;
+                curSweepTotalRays += nRaysAbs;          // unchanged point counting (feeds PDVR)
                 foreach (var r in ranges)
-                    if (r > 0f && r < float.MaxValue) { curSweepNValid[binIdx]++; curSweepValidHits++; }
-                // E[bin]: expected geometric weight, tan-projection density 1/(1+(y/h)^2)
-                float yk = crossTrackPos; float h = curSweepAltitude;
-                float wGeom = 1f / (1f + (yk * yk) / (h * h));
-                curSweepExpected[binIdx] += wGeom * nRays;
+                    if (r > 0f && r < float.MaxValue) curSweepValidHits++;
+                AccumulateCCIAbsolute(ranges, omega);
             }
             curSweepLastFiringPos = position;
         }
 
-        // 3. Àë¿ª³¯µØ°ëÈ¦£ºcommit sweep
+        // 3. ç¦»å¼€æœåœ°åŠåœˆï¼šcommit sweep
+        if (traceTiming && inGroundFacingHalf)
+            sweepTiming.AddAssessmentTicks(System.Diagnostics.Stopwatch.GetTimestamp() - _t0);
         if (!inGroundFacingHalf && prevInGroundFacingHalf)
+        {
+            if (traceCommit) sweepTiming.StartCommit(firingSimTime);
             CommitCurrentSweep();
+        }
 
         prevInGroundFacingHalf = inGroundFacingHalf;
         metricTicksThisSweep += System.Diagnostics.Stopwatch.GetTimestamp() - _t0;
+        // Separate diagnostic output, deliberately outside legacy timing.
+        if (traceCommit) sweepTiming.WriteCompleted(sweepCounter, WindowSize, CurrentPhase);
     }
 
 
@@ -208,24 +249,27 @@ public class StreamingQualityAssessment : MonoBehaviour
         metricTicksThisSweep = 0;
         int W = Mathf.Max(2, WindowSize);
 
-        // === sweep centroid (Ë®Æ½Í¶Ó°) ===
+        // === sweep centroid (æ°´å¹³æŠ•å½±) ===
         Vector3 centroid = (curSweepFirstFiringPos + curSweepLastFiringPos) * 0.5f;
-        centroid.y = 0f;  // Ë®Æ½Í¶Ó°£¬È¥³ı¸ß¶È¶¶¶¯ (B2 ·½°¸)
+        centroid.y = 0f;  // æ°´å¹³æŠ•å½±ï¼Œå»é™¤é«˜åº¦æŠ–åŠ¨
 
-        // === w_i: ¼¸ºÎ swath ¿í¶È (ÂÛÎÄ Eq.3) ===
-        float wi = 2f * curSweepAltitude * Mathf.Tan(MaxScanAngleFromNadir * Mathf.Deg2Rad);
+        // === w_i: å‡ ä½• swath å®½åº¦ (è®ºæ–‡ Eq.3) ===
+        float angularWidth = 2f * curSweepAltitude * Mathf.Tan(MaxScanAngleFromNadir * Mathf.Deg2Rad);
+        float rangeWidth = 2f * Mathf.Sqrt(Mathf.Max(0f,
+            MaxDetectionDistance * MaxDetectionDistance - curSweepAltitude * curSweepAltitude));
+        float wi = Mathf.Min(angularWidth, rangeWidth);
 
         if (hasPrevSweep)
         {
-            // === d_i: ÏàÁÚ sweep nadir centroid ÑØº½¼£¾àÀë (ÂÛÎÄ Eq.13) ===
+            // === d_i: ç›¸é‚» sweep nadir centroid æ²¿èˆªè¿¹è·ç¦» (è®ºæ–‡ Eq.13) ===
             float di = Vector3.Distance(centroid, prevSweepCentroid);
 
-            // === ¦Ñ_i: per-sweep density (ÂÛÎÄ Eq.13) ===
+            // === Ï_i: per-sweep density (è®ºæ–‡ Eq.13) ===
             float rhoI = (wi > 1e-6f && di > 1e-6f)
                 ? curSweepValidHits / (wi * di)
                 : 0f;
 
-            // --- PDVR ÔöÁ¿ (ÂÛÎÄ Eq.15-16) ---
+            // --- PDVR å¢é‡ (è®ºæ–‡ Eq.15-16) ---
             if (prevSweepDensity > 1e-9f)
             {
                 float r = Mathf.Abs(rhoI - prevSweepDensity) / prevSweepDensity;
@@ -235,7 +279,7 @@ public class StreamingQualityAssessment : MonoBehaviour
                     pdvrSum -= rHistory.Dequeue();
             }
 
-            // --- ISC ÔöÁ¿ (ÂÛÎÄ Eq.17-18) ---
+            // --- ISC å¢é‡ (è®ºæ–‡ Eq.17-18) ---
             dHistory.Enqueue(di);
             sumD += di;
             sumD2 += (double)di * di;
@@ -251,10 +295,10 @@ public class StreamingQualityAssessment : MonoBehaviour
         }
         else
         {
-            prevSweepDensity = 0f;  // Ê×¸ö sweep »¹ÎŞ·¨Ëã d_i / ¦Ñ_i
+            prevSweepDensity = 0f;  // é¦–ä¸ª sweep è¿˜æ— æ³•ç®— d_i / Ï_i
         }
 
-        // --- CCI ÔöÁ¿ (ÂÛÎÄ Eq.19-20) ---
+        // --- CCI å¢é‡ (è®ºæ–‡ Eq.19-20) ---
         float cciI = ComputeSweepCCI();
         cciHistory.Enqueue(cciI);
         sumCCI += cciI;
@@ -267,22 +311,23 @@ public class StreamingQualityAssessment : MonoBehaviour
 
         if (sweepCounter == 100)
         {
-            float sweepDuration = 0.5f / (MaxScanAngleFromNadir / 90f);  // °ëÈ¦ºÄÊ±½üËÆ
-                                                                         // ¸ü×¼È·£ºÖ±½ÓÓÃ firing ÊıÍÆ
-            int firingsThisSweep = curSweepTotalRays / 16;  // Ã¿ firing 16 ray
+            float sweepDuration = 0.5f / (MaxScanAngleFromNadir / 90f);  // åŠåœˆè€—æ—¶è¿‘ä¼¼
+                                                                         // æ›´å‡†ç¡®ï¼šç›´æ¥ç”¨ firing æ•°æ¨
+            int firingsThisSweep = curSweepTotalRays / 16;  // æ¯ firing 16 ray
             Debug.Log($"[3.2.1 STATS] " +
                       $"pts/sweep={curSweepTotalRays} " +
                       $"firings/sweep={firingsThisSweep} " +
                       $"(half-rev)");
         }
 
-        // Ã¿ commit Ò»¸ö sweep ¶¼Êä³ö£¨²»ÔÙÓÃ CalculationStep ½ÚÁ÷£©
+        // æ¯ commit ä¸€ä¸ª sweep éƒ½è¾“å‡ºï¼ˆä¸å†ç”¨ CalculationStep èŠ‚æµï¼‰
         EmitCurrentMetricsSweepLevel();
     }
 
-    
+
     private float ComputeSweepCCI()
     {
+        if (useAbsoluteExpectation) return ComputeSweepCCIAbsolute();
         // Method A: h_k = N_k / E_k (actual / expected). Nominal -> ~1; gaps -> drop.
         if (curSweepNValid == null || curSweepExpected == null) return 0f;
         int sumN_all = 0; float sumE_all = 0f;
@@ -308,6 +353,64 @@ public class StreamingQualityAssessment : MonoBehaviour
     }
 
 
+    // Expected counts from the firing geometry only. A channel is expected to return if
+    // its flat-ground slant range h / (cos(omega) cos(theta_i)) is within MaxDetectionDistance;
+    // returned and expected counts are taken over this same set of rays. Bins span the
+    // range-limited swath +-sqrt(Rmax^2 - h^2) instead of h*tan(omegaMax).
+    private void AccumulateCCIAbsolute(List<float> ranges, float omega)
+    {
+        float h = curSweepAltitude;
+        float R = MaxDetectionDistance;
+        if (h <= 0f || h >= R) return;
+        float cosO = Mathf.Cos(omega);
+        if (cosO <= 1e-6f) return;
+        float swathHalf = Mathf.Sqrt(R * R - h * h);
+        float y = h * Mathf.Tan(omega);
+        if (Mathf.Abs(y) > swathHalf) return;
+        int binIdx = Mathf.Clamp(
+            Mathf.FloorToInt((y + swathHalf) / (2f * swathHalf) * CCIBinCount),
+            0, CCIBinCount - 1);
+        int n = ranges.Count;
+        float fov = VerticalFOVDeg * Mathf.Deg2Rad;
+        if (testRng == null) testRng = new System.Random(testSeed);
+        for (int j = 0; j < n; j++)
+        {
+            // same beam-angle formula as the flight script (channel index j + 1)
+            float theta = -((2f * (j + 1) - n - 1) / (2f * n)) * fov;
+            float slant = h / (cosO * Mathf.Cos(theta));
+            if (slant > R) continue;
+            curSweepExpected[binIdx] += 1f;
+            float r = ranges[j];
+            bool returned = r > 0f && r < float.MaxValue;
+            if (returned && binIdx == testDropBin) returned = false;
+            if (returned && testDropoutFraction > 0f && testRng.NextDouble() < testDropoutFraction) returned = false;
+            if (returned) curSweepNValid[binIdx]++;
+        }
+    }
+
+    // No rescaling of expected counts. g = received / expected over the active bins,
+    // so a uniform loss of returns lowers g. Fewer than two active bins returns g (not 1).
+    private float ComputeSweepCCIAbsolute()
+    {
+        if (curSweepNValid == null || curSweepExpected == null) return 0f;
+        var hRatios = new List<float>(CCIBinCount);
+        float sumN = 0f, sumE = 0f;
+        for (int k = 0; k < CCIBinCount; k++)
+        {
+            float Ek = curSweepExpected[k];
+            if (Ek >= CCIMinBinFirings) { hRatios.Add(curSweepNValid[k] / Ek); sumN += curSweepNValid[k]; sumE += Ek; }
+        }
+        if (sumE < 1e-6f) return 0f;
+        float g = Mathf.Clamp01(sumN / sumE);
+        if (hRatios.Count < 2) return g;
+        float mu = 0f; for (int i = 0; i < hRatios.Count; i++) mu += hRatios[i]; mu /= hRatios.Count;
+        if (mu < 1e-6f) return 0f;
+        float var = 0f; for (int i = 0; i < hRatios.Count; i++) { float dx = hRatios[i] - mu; var += dx * dx; }
+        var /= hRatios.Count;
+        float uniformity = Mathf.Max(0f, 1f - Mathf.Sqrt(var) / mu);
+        return g * uniformity;
+    }
+
     private void EmitCurrentMetricsSweepLevel()
     {
         int nR = rHistory.Count;
@@ -316,7 +419,7 @@ public class StreamingQualityAssessment : MonoBehaviour
 
         QualityMetrics m = new QualityMetrics
         {
-            scanIndex = sweepCounter,           // ÕâÀïÓÃ sweep index ¶ø·Ç firing index
+            scanIndex = sweepCounter,           // è¿™é‡Œç”¨ sweep index è€Œé firing index
             timestamp = Time.fixedTime,
             PDVR = nR > 0 ? (float)(pdvrSum / nR) : 0f,
             ISC = ComputeISC(nD),
@@ -326,9 +429,11 @@ public class StreamingQualityAssessment : MonoBehaviour
             rhoI = lastRhoI,
         };
         m.warning = GenerateWarning(m);
+        // Result is computed here; metric CSV, console and diagnostic I/O follow.
+        if (enableSweepTiming && sweepTiming != null) sweepTiming.ResultReady();
         WriteMetricLine(m);
 
-        if (!string.IsNullOrEmpty(m.warning))
+        if (logAlertsToConsole && !string.IsNullOrEmpty(m.warning))
             Debug.LogWarning($"[Quality Alert at sweep {sweepCounter}] {m.warning}");
     }
 
@@ -336,7 +441,7 @@ public class StreamingQualityAssessment : MonoBehaviour
 
 
 
-    // Ö÷Òª½Ó¿Ú£ºÌí¼ÓĞÂµÄÉ¨ÃèÏß
+    // ä¸»è¦æ¥å£ï¼šæ·»åŠ æ–°çš„æ‰«æçº¿
     public void AddScanLine(List<float> ranges, Vector3 position, float velocity)
     {
         scanCounter++;
@@ -347,7 +452,7 @@ public class StreamingQualityAssessment : MonoBehaviour
 
         if (hasPrevScan)
         {
-            // --- PDVR ÔöÁ¿£¨Eq.(13)£©---
+            // --- PDVR å¢é‡ï¼ˆEq.(13)ï¼‰---
             float currDensity = CalculatePointDensity(newScan, prevPosition);
             if (prevDensity > 1e-9f)
             {
@@ -359,7 +464,7 @@ public class StreamingQualityAssessment : MonoBehaviour
             }
             prevDensity = currDensity;
 
-            // --- ISC ÔöÁ¿£¨Eq.(15)(16)£©---
+            // --- ISC å¢é‡ï¼ˆEq.(15)(16)ï¼‰---
             float d = Vector3.Distance(position, prevPosition);
             dHistory.Enqueue(d);
             sumD += d;
@@ -373,11 +478,11 @@ public class StreamingQualityAssessment : MonoBehaviour
         }
         else
         {
-            // Ê×ÌõÉ¨ÃèÏß£º½ö³õÊ¼»¯ prevDensity£¬²»ÄÜËã r_i
-            prevDensity = CalculatePointDensity(newScan, position); // d=0£¬»áµÃµ½ 0
+            // é¦–æ¡æ‰«æçº¿ï¼šä»…åˆå§‹åŒ– prevDensityï¼Œä¸èƒ½ç®— r_i
+            prevDensity = CalculatePointDensity(newScan, position); // d=0ï¼Œä¼šå¾—åˆ° 0
         }
 
-        // --- CCI ÔöÁ¿£¨Eq.(20)£©---
+        // --- CCI å¢é‡ï¼ˆEq.(20)ï¼‰---
         float scanCCI = ComputeScanCCI(newScan);
         cciHistory.Enqueue(scanCCI);
         sumCCI += scanCCI;
@@ -387,7 +492,7 @@ public class StreamingQualityAssessment : MonoBehaviour
         prevPosition = position;
         hasPrevScan = true;
 
-        // ÈÔ±£Áô slidingWindow ¹©µ÷ÊÔ/µ¼³ö£¨²»ÔÙÓÃÓÚÖØËã£©
+        // ä»ä¿ç•™ slidingWindow ä¾›è°ƒè¯•/å¯¼å‡ºï¼ˆä¸å†ç”¨äºé‡ç®—ï¼‰
         slidingWindow.Enqueue(newScan);
         while (slidingWindow.Count > WindowSize) slidingWindow.Dequeue();
 
@@ -395,7 +500,7 @@ public class StreamingQualityAssessment : MonoBehaviour
             EmitCurrentMetrics();
     }
 
-    // ¼ÆËãËùÓĞÖÊÁ¿Ö¸±ê
+    // è®¡ç®—æ‰€æœ‰è´¨é‡æŒ‡æ ‡
     private void EmitCurrentMetrics()
     {
         int nR = rHistory.Count;
@@ -414,7 +519,7 @@ public class StreamingQualityAssessment : MonoBehaviour
         m.warning = GenerateWarning(m);
         WriteMetricLine(m);
 
-        if (!string.IsNullOrEmpty(m.warning))
+        if (logAlertsToConsole && !string.IsNullOrEmpty(m.warning))
             Debug.LogWarning($"[Quality Alert at scan {scanCounter}] {m.warning}");
     }
 
@@ -436,27 +541,27 @@ public class StreamingQualityAssessment : MonoBehaviour
         return hitRate * lateral;
     }
 
-    // ¸¨Öúº¯Êı£º¼ÆËãµãÃÜ¶È
-    // ÂÛÎÄ Eq.(11): ¦Ñ_i = n_i^pts / (w_i * d_i)
+    // è¾…åŠ©å‡½æ•°ï¼šè®¡ç®—ç‚¹å¯†åº¦
+    // è®ºæ–‡ Eq.(11): Ï_i = n_i^pts / (w_i * d_i)
     private float CalculatePointDensity(ScanLineData scan, Vector3 prevPos)
     {
-        // w_i£ºµ±Ç°¸ß¶ÈÏÂµÄ¼¸ºÎÉ¨·ù£¬ÊµÊ±·´Ó³ ¦Å_z ÒıÆğµÄ¾Ö²¿ÈÅ¶¯
+        // w_iï¼šå½“å‰é«˜åº¦ä¸‹çš„å‡ ä½•æ‰«å¹…ï¼Œå®æ—¶åæ˜  Îµ_z å¼•èµ·çš„å±€éƒ¨æ‰°åŠ¨
         float h = Mathf.Max(0.1f, scan.position.y);
         float w = 2f * h * Mathf.Tan(MaxScanAngleFromNadir * Mathf.Deg2Rad);
 
-        // d_i£ºÓëÉÏÒ»ÌõÉ¨ÃèÏßµÄÕæÊµÈıÎ¬¾àÀë£¨Óë ISC Ò»ÖÂ£©
+        // d_iï¼šä¸ä¸Šä¸€æ¡æ‰«æçº¿çš„çœŸå®ä¸‰ç»´è·ç¦»ï¼ˆä¸ ISC ä¸€è‡´ï¼‰
         float d = Vector3.Distance(scan.position, prevPos);
         if (d < 1e-6f || w < 1e-6f) return 0f;
 
         return scan.validHits / (w * d);
     }
 
-    // ¸¨Öúº¯Êı£º¼ÆËãºáÏò·Ö²¼¾ùÔÈĞÔ
+    // è¾…åŠ©å‡½æ•°ï¼šè®¡ç®—æ¨ªå‘åˆ†å¸ƒå‡åŒ€æ€§
     private float CalculateLateralUniformity(List<float> ranges)
     {
         if (ranges.Count < 4) return 1.0f;
 
-        // ½«ÉäÏß·Ö³É4¸öÇøÓò£¬¼ì²éÃ¿¸öÇøÓòµÄÓĞĞ§»÷ÖĞ
+        // å°†å°„çº¿åˆ†æˆ4ä¸ªåŒºåŸŸï¼Œæ£€æŸ¥æ¯ä¸ªåŒºåŸŸçš„æœ‰æ•ˆå‡»ä¸­
         int sectorsCount = 4;
         int raysPerSector = ranges.Count / sectorsCount;
         List<int> sectorHits = new List<int>();
@@ -476,7 +581,7 @@ public class StreamingQualityAssessment : MonoBehaviour
             sectorHits.Add(hits);
         }
 
-        // ¼ÆËã¾ùÔÈĞÔ
+        // è®¡ç®—å‡åŒ€æ€§
         float mean = (float)sectorHits.Average();
         if (mean == 0) return 0;
 
@@ -484,30 +589,30 @@ public class StreamingQualityAssessment : MonoBehaviour
         return 1.0f - (std / mean);
     }
 
-    // Éú³É¾¯¸æĞÅÏ¢
+    // ç”Ÿæˆè­¦å‘Šä¿¡æ¯
     private string GenerateWarning(QualityMetrics metrics)
     {
         List<string> warnings = new List<string>();
 
         if (metrics.PDVR > PDVRThreshold)
         {
-            warnings.Add($"ÃÜ¶È±ä»¯¹ı´ó(PDVR={metrics.PDVR:F3})");
+            warnings.Add($"å¯†åº¦å˜åŒ–è¿‡å¤§(PDVR={metrics.PDVR:F3})");
         }
 
         if (metrics.ISC > ISCThreshold)
         {
-            warnings.Add($"É¨Ãè¼ä¾à²»Ò»ÖÂ(ISC={metrics.ISC:F3})");
+            warnings.Add($"æ‰«æé—´è·ä¸ä¸€è‡´(ISC={metrics.ISC:F3})");
         }
 
         if (metrics.CCI < CCIThreshold)
         {
-            warnings.Add($"¸²¸ÇÖÊÁ¿²»×ã(CCI={metrics.CCI:F3})");
+            warnings.Add($"è¦†ç›–è´¨é‡ä¸è¶³(CCI={metrics.CCI:F3})");
         }
 
         return string.Join("; ", warnings);
     }
 
-    // ±£´æÖÊÁ¿ÆÀ¹À½á¹û
+    // ä¿å­˜è´¨é‡è¯„ä¼°ç»“æœ
     // Open streaming metrics CSV. Call once at scan start.
     public void OpenMetricsStream(string outputDir)
     {
@@ -569,7 +674,7 @@ public class StreamingQualityAssessment : MonoBehaviour
 
 
 
-    // ÇåÀí×ÊÔ´
+    // æ¸…ç†èµ„æº
     public void Clear()
     {
         slidingWindow.Clear();
@@ -596,7 +701,12 @@ public class StreamingQualityAssessment : MonoBehaviour
     }
 
 
-    // ¹©ÊµÊ±ÏÔÊ¾¶ÁÈ¡×î½üµÄÖ¸±ê
+    private void OnDisable()
+    {
+        if (sweepTiming != null) { sweepTiming.Dispose(); sweepTiming = null; }
+    }
+
+    // ä¾›å®æ—¶æ˜¾ç¤ºè¯»å–æœ€è¿‘çš„æŒ‡æ ‡
     public struct MetricSnapshot { public float pdvr, isc, cci; }
 
     public MetricSnapshot GetLatestMetrics()

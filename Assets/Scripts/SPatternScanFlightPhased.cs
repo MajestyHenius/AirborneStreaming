@@ -1,4 +1,4 @@
-﻿using System.Collections;
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using System.IO;
@@ -6,17 +6,19 @@ using System.Text;
 using System;
 public class SPatternScanFlightPhased : MonoBehaviour
 {
+    // Optional terrain-experiment observers. No subscribers in normal scene runs.
+    public event Action<float, Vector3, Quaternion, float, bool> TerrainFiringObserved;
+    public event Action<Vector3, Vector3, RaycastHit> TerrainReturnObserved;
     [Header("===== LiDAR配置 (VLP-16 等效) =====")]
-    // 真实 VLP-16: 16 通道, 30°垂直FOV, 360°水平FOV, 10Hz, ~28800 pts/rev, 100m
+    // Idealised VLP-16 configuration: 16 channels, 30-degree fan, 10 Hz, 28,800 nominal firings/revolution, 100 m range.
     [SerializeField] private int lines = 16;                        // n: 通道数
     [SerializeField] private float verticalFOV = 30f;               // Θ: 沿航向扇面 (deg), VLP-16 = ±15°
     [SerializeField] private float maxDetectionDistance = 100f;     // VLP-16 max range
-    // 注意：原来的 laserAngles / elevationAngle / scanFrequency 已被上面的参数替代或移除
     [Header("===== 等效旋转扫描参数 =====")]
     [SerializeField] private float rotationFrequency = 10f;          // 真机值 10 Hz
-    [SerializeField] private float maxScanAngleFromNadir = 75f;
+    [SerializeField] private float maxScanAngleFromNadir = 89f;
     [SerializeField] private float initialRotationPhase = 0f;
-    // 新增：每个 FixedUpdate 内 firing 的次数
+    // 每个 FixedUpdate 内 firing 的次数
     // 50 Hz × 360 = 18 kHz，对齐 VLP-16 真机重频
     // ω/f = 2π·10 / 18000 = 0.2°/firing 严格等效
     [SerializeField] private int firingsPerFixedUpdate = 360;
@@ -30,6 +32,7 @@ public class SPatternScanFlightPhased : MonoBehaviour
     [SerializeField] private float cruiseAcceleration = 0f;     // a, m/s²，沿航向恒定加速度（0 = 关闭）
     [SerializeField] private float targetCruiseSpeedAfterAccel = 5f;  // 加/减速达到此速度后保持
     [SerializeField] private float vibrationSigma = 0f;         // σ_v, m/s，ε_y/ε_z 的标准差（0 = 关闭）
+    [SerializeField] private int randomSeed = 1;                // suijizi (fixed for reproducibility)
     [SerializeField] private bool resetAccelPerSwath = true;    // 是否每条航线起点重置 t
 
 
@@ -104,7 +107,7 @@ public class SPatternScanFlightPhased : MonoBehaviour
         public float intensity;
         public float distance;
     }
-    // 完全复制盘旋代码的变量
+    // 转弯状态
     private float currentAngle = 0f; // 当前在圆上的角度 (rad)
     private float currentBankAngle = 0f; // 当前实际倾斜角度
     private Vector3 circleCenter; // 当前转弯圆心
@@ -129,8 +132,8 @@ public class SPatternScanFlightPhased : MonoBehaviour
     private int fixedStepCounter = 0;
 
     private string sessionId;
-    // --- perf instrumentation (additive) ---
-    [SerializeField] private bool savePointCloud = false;  // off for perf/timeseries runs -> constant memory
+    // --- Performance instrumentation ---
+    [SerializeField] private bool savePointCloud = false;  // Disable to avoid retaining point-cloud text for export.
     [SerializeField] private bool saveRangeMatrix = false;
     [SerializeField] private bool saveTrajectory = false;
     [SerializeField] private bool enablePointDisplay = false;  // off for perf/timeseries -> no allPointsData growth
@@ -161,6 +164,7 @@ public class SPatternScanFlightPhased : MonoBehaviour
 
     void Start()
     {
+        UnityEngine.Random.InitState(randomSeed);   // fixed RNG stream for reproducible vibration runs
         InitializeSystem();
         if (showInWorld) InitializePointCloudVisualization();
         if (showInUI)
@@ -184,7 +188,7 @@ public class SPatternScanFlightPhased : MonoBehaviour
     {
         sessionId = DateTime.Now.ToString("yyyyMMdd_HHmmss");
 
-        // 完全复制盘旋的刚体设置
+        // 刚体设置
         rb = GetComponent<Rigidbody>();
         if (rb == null)
         {
@@ -438,7 +442,7 @@ public class SPatternScanFlightPhased : MonoBehaviour
         // 初始化UI粒子数组
         uiDisplayParticles = new ParticleSystem.Particle[maxDisplayPoints];
 
-        // 修复颜色梯度设置
+        // 颜色梯度设置
         if (heightGradient == null || heightGradient.colorKeys.Length == 0)
         {
             heightGradient = CreateGradient(
@@ -869,14 +873,14 @@ public class SPatternScanFlightPhased : MonoBehaviour
             rb.AddForce(positionError.normalized * rb.mass * positionError.magnitude * 5f);
         }
 
-        // 计算并应用倾斜角（完全复制盘旋）
+        // 计算并应用倾斜角
         float targetBankAngle = Mathf.Atan2(cruiseSpeed * cruiseSpeed, turnRadius * Physics.gravity.magnitude) * Mathf.Rad2Deg;
         targetBankAngle = Mathf.Clamp(targetBankAngle, 0, maxBankAngle);
         if (!turningRight) targetBankAngle = -targetBankAngle;
 
         currentBankAngle = Mathf.Lerp(currentBankAngle, targetBankAngle, Time.fixedDeltaTime * bankSmoothSpeed);
 
-        // 升力（完全复制盘旋）
+        // 升力
         float gravityForce = Physics.gravity.magnitude * rb.mass;
         float heightError = targetHeight - transform.position.y;
         float heightCorrection = Mathf.Clamp(heightError * 0.01f, -0.1f, 0.1f);
@@ -975,6 +979,9 @@ public class SPatternScanFlightPhased : MonoBehaviour
         {
             float u = (k + 1f) / N;            // 子步时间分数 (0,1]
             float tSub = t0 + u * dt;
+            // Entry into this simulated firing, before geometry/raycast work.
+            long firingWallTick = (qualityAssessor != null && qualityAssessor.enableSweepTiming)
+                ? System.Diagnostics.Stopwatch.GetTimestamp() : 0;
 
             float omega = ComputeOmegaAt(tSub);
             bool isGroundFacing = Mathf.Abs(omega) <= omegaMax;
@@ -987,6 +994,7 @@ public class SPatternScanFlightPhased : MonoBehaviour
             Vector3 scanPosition = Vector3.Lerp(startPos, endPos, u);
             Quaternion scanRotation = Quaternion.Slerp(startRot, endRot, u);
 
+            TerrainFiringObserved?.Invoke(tSub, scanPosition, scanRotation, omega, isGroundFacing);
             //
             List<float> currentScanRanges = new List<float>(lines);
 
@@ -1022,6 +1030,7 @@ public class SPatternScanFlightPhased : MonoBehaviour
                         Vector3 hitPoint = hit.point;
                         float scanAngleDeg = omega * Mathf.Rad2Deg;
                         float intensity = CalculateIntensity(hit, range);
+                        TerrainReturnObserved?.Invoke(scanPosition, worldDirection, hit);
 
                         if (savePointCloud)
                         pointCloudData.AppendLine(
@@ -1046,7 +1055,7 @@ public class SPatternScanFlightPhased : MonoBehaviour
             
             if (qualityAssessor != null)
             {
-                qualityAssessor.OnFiring(currentScanRanges, scanPosition, omega);
+                qualityAssessor.OnFiring(currentScanRanges, scanPosition, omega, tSub, firingWallTick);
             }
 
         }
@@ -1237,11 +1246,6 @@ public class SPatternScanFlightPhased : MonoBehaviour
                 normalizedValue = Mathf.InverseLerp(minDistance, maxDistance, distance);
                 pointColor = distanceGradient.Evaluate(Mathf.Clamp01(normalizedValue));
 
-                // 调试输出，帮助验证
-                if (UnityEngine.Random.Range(0, 100) < 1) // 随机输出1%的点用于调试
-                {
-                    //Debug.Log($"Distance: {distance:F1}m, Normalized: {normalizedValue:F2}, Color: {pointColor}");
-                }
                 break;
         }
 

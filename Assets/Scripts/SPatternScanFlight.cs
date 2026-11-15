@@ -1,4 +1,4 @@
-﻿using System.Collections;
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using System.IO;
@@ -11,12 +11,11 @@ public class SPatternScanFlight : MonoBehaviour
     [SerializeField] private int lines = 16;                        // n: 通道数
     [SerializeField] private float verticalFOV = 30f;               // Θ: 沿航向扇面 (deg), VLP-16 = ±15°
     [SerializeField] private float maxDetectionDistance = 100f;     // VLP-16 max range
-    // 注意：原来的 laserAngles / elevationAngle / scanFrequency 已被上面的参数替代或移除
     [Header("===== 等效旋转扫描参数 =====")]
     [SerializeField] private float rotationFrequency = 10f;          // 真机值 10 Hz
     [SerializeField] private float maxScanAngleFromNadir = 75f;
     [SerializeField] private float initialRotationPhase = 0f;
-    // 新增：每个 FixedUpdate 内 firing 的次数
+    // 每个 FixedUpdate 内 firing 的次数
     // 50 Hz × 360 = 18 kHz，对齐 VLP-16 真机重频
     // ω/f = 2π·10 / 18000 = 0.2°/firing 严格等效
     [SerializeField] private int firingsPerFixedUpdate = 360;
@@ -103,7 +102,7 @@ public class SPatternScanFlight : MonoBehaviour
         public float intensity;
         public float distance;
     }
-    // 完全复制盘旋代码的变量
+    // 转弯状态
     private float currentAngle = 0f; // 当前在圆上的角度 (rad)
     private float currentBankAngle = 0f; // 当前实际倾斜角度
     private Vector3 circleCenter; // 当前转弯圆心
@@ -176,7 +175,7 @@ public class SPatternScanFlight : MonoBehaviour
     {
         sessionId = DateTime.Now.ToString("yyyyMMdd_HHmmss");
 
-        // 完全复制盘旋的刚体设置
+        // 刚体设置
         rb = GetComponent<Rigidbody>();
         if (rb == null)
         {
@@ -413,7 +412,7 @@ public class SPatternScanFlight : MonoBehaviour
         // 初始化UI粒子数组
         uiDisplayParticles = new ParticleSystem.Particle[maxDisplayPoints];
 
-        // 修复颜色梯度设置
+        // 颜色梯度设置
         if (heightGradient == null || heightGradient.colorKeys.Length == 0)
         {
             heightGradient = CreateGradient(
@@ -829,14 +828,14 @@ public class SPatternScanFlight : MonoBehaviour
             rb.AddForce(positionError.normalized * rb.mass * positionError.magnitude * 5f);
         }
 
-        // 计算并应用倾斜角（完全复制盘旋）
+        // 计算并应用倾斜角
         float targetBankAngle = Mathf.Atan2(cruiseSpeed * cruiseSpeed, turnRadius * Physics.gravity.magnitude) * Mathf.Rad2Deg;
         targetBankAngle = Mathf.Clamp(targetBankAngle, 0, maxBankAngle);
         if (!turningRight) targetBankAngle = -targetBankAngle;
 
         currentBankAngle = Mathf.Lerp(currentBankAngle, targetBankAngle, Time.fixedDeltaTime * bankSmoothSpeed);
 
-        // 升力（完全复制盘旋）
+        // 升力
         float gravityForce = Physics.gravity.magnitude * rb.mass;
         float heightError = targetHeight - transform.position.y;
         float heightCorrection = Mathf.Clamp(heightError * 0.01f, -0.1f, 0.1f);

@@ -1,5 +1,0 @@
-# S-Pattern LiDAR Scan
-# Lines: 64
-# FOV: 70
-# Height: 150
-# X Y Z

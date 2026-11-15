@@ -105,5 +105,43 @@ InitTestScene*.unity*
 # Auto-generated cache in Assets folder
 /[Aa]ssets/[Ss]ceneDependencyCache*
 
-# 点云数据走 Zenodo,不入库
+# Generated scans and local experiment outputs
 /PointClouds/
+/PointClouds.*
+/Assets/PointClouds/
+/Assets/PointClouds.meta
+/*Validation*/
+/Revision2_*/
+**/.less/
+**/.less.meta
+*.zip
+*.rar
+*.7z
+*.bak
+*.bak.meta
+
+# Local diagnostic runners, temporary scenes, and IDE templates
+/Assets/Editor/Revision*.cs*
+/Assets/Editor/ColliderCookProbe.cs*
+/Assets/Scripts/Revision*.cs*
+/Assets/Scripts/QualityMetricComparisonExperiment.cs*
+/Assets/Scripts/Visual Studio 2022*
+/Assets/Scenes/*_TEMP.unity*
+/Assets/Scenes/*_old.unity*
+/Assets/Scenes/*_Claude.unity*
+/Assets/Scenes/Scenes/
+/Assets/Scenes/Scenes.meta
+
+# Private revision notes and manuscript files
+/AGENTS.md
+/HANDOFF*
+/JSTARS_REVISION_STATUS.md
+/Revision*
+*.docx
+*.tex
+*.aux
+*.synctex.gz
+.env
+.env.*
+*.pem
+*.key

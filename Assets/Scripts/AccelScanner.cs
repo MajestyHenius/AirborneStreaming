@@ -11,7 +11,7 @@ using System;
 ///         给定恒定 a, 速度 v(t)=v0+at 上升 -> 点密度下降 -> PDVR 应反映 a/v。
 /// 运动:   匀速起步 -> 恒定加速度 a 加速到 targetSpeedAfterAccel -> 保持。直线, 无振动无转弯。
 /// 参数:   HET09, W=50, 起步 5 m/s, a=1 m/s² (tab:trajectory), 50m AGL。
-///         targetSpeedAfterAccel = 加速上限 (默认 10, 见下方 TODO 确认)。
+///         targetSpeedAfterAccel = 加速上限 (默认 10 m/s)。
 /// 预期:   加速段 PDVR 明显 > 0 且与 a/v 一致; 到达上限转匀速后 PDVR 回落到≈0。
 ///         CSV Phase 列: 加速段 "Accel", 到达上限后 "Cruise"。
 ///
@@ -34,7 +34,7 @@ public class AccelScanner : MonoBehaviour
     [Header("===== 平台运动 (tab:trajectory) =====")]
     [SerializeField] private float initialSpeed = 5f;             // v0, m/s
     [SerializeField] private float acceleration = 1f;            // a, m/s²
-    // TODO 确认: 加速上限。论文里应有此值, 用户确认后改。暂填 10。
+    // 加速上限；在 Inspector 中配置。
     [SerializeField] private float targetSpeedAfterAccel = 10f;  // 加速到此速度后保持
     [SerializeField] private float targetHeight = 50f;          // AGL, m
     [SerializeField] private float flightLength = 400f;         // 直线总长 m

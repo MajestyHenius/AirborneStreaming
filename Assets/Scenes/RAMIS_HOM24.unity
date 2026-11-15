@@ -525620,6 +525620,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   CurrentPhase: cruise
   WindowSize: 50
+  logAlertsToConsole: 0
   CalculationStep: 10
   PDVRThreshold: 0.1
   ISCThreshold: 0.15
@@ -525627,6 +525628,12 @@ MonoBehaviour:
   MaxScanAngleFromNadir: 89
   CCIBinCount: 4
   CCIMinBinFirings: 2
+  useAbsoluteExpectation: 1
+  MaxDetectionDistance: 100
+  VerticalFOVDeg: 30
+  testDropoutFraction: 0
+  testDropBin: -1
+  testSeed: 1
 --- !u!4 &1568129332
 Transform:
   m_ObjectHideFlags: 0
@@ -600468,7 +600475,6 @@ GameObject:
   - component: {fileID: 1797173359}
   - component: {fileID: 1797173357}
   - component: {fileID: 1797173360}
-  - component: {fileID: 1797173356}
   - component: {fileID: 1797173361}
   m_Layer: 0
   m_Name: Airplatform
@@ -600477,18 +600483,6 @@ GameObject:
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 0
---- !u!114 &1797173356
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1797173355}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: ffd1f4a388f8b9e4c9323d3b1433de05, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
 --- !u!23 &1797173357
 MeshRenderer:
   m_ObjectHideFlags: 0
@@ -713843,7 +713837,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 919132147971198695}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 0b23aa502a3394143a375d06b1eabe07, type: 3}
   m_Name: 
@@ -713898,7 +713892,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 919132147971198695}
-  m_Enabled: 0
+  m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: fa9a54a62a6514045988aa66f557ec82, type: 3}
   m_Name: 
@@ -713907,7 +713901,7 @@ MonoBehaviour:
   verticalFOV: 30
   maxDetectionDistance: 100
   rotationFrequency: 10
-  maxScanAngleFromNadir: 75
+  maxScanAngleFromNadir: 89
   initialRotationPhase: 0
   firingsPerFixedUpdate: 360
   qualityAssessor: {fileID: 1568129331}
@@ -713916,6 +713910,7 @@ MonoBehaviour:
   cruiseAcceleration: 2
   targetCruiseSpeedAfterAccel: 15
   vibrationSigma: 0
+  randomSeed: 1
   resetAccelPerSwath: 1
   swathWidth: 60
   numberOfSwaths: 5
@@ -713929,9 +713924,9 @@ MonoBehaviour:
   currentState: 0
   totalPointsCollected: 0
   distanceInCurrentSwath: 0
-  showInWorld: 1
-  showInUI: 1
-  enableRealtimeVisualization: 1
+  showInWorld: 0
+  showInUI: 0
+  enableRealtimeVisualization: 0
   maxDisplayPoints: 70000
   pointDisplaySize: 0.2
   minHeightColor: 0
@@ -714040,6 +714035,10 @@ MonoBehaviour:
   uiPointScale: 1
   uiViewDistance: 200
   uiCameraFOV: 90
+  savePointCloud: 0
+  saveRangeMatrix: 0
+  saveTrajectory: 1
+  enablePointDisplay: 0
 --- !u!4 &1271689216388656276
 Transform:
   m_ObjectHideFlags: 0

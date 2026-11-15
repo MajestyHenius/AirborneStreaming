@@ -1,191 +1,157 @@
-# 🛰️ Streaming Airborne LiDAR Simulator (Rotating Multi-Beam)
+# Streaming Airborne LiDAR Simulator
 
-_A Unity-based simulator for airborne rotating multi-beam LiDAR with real-time point cloud generation and on-the-fly scan-quality assessment._
+A Unity implementation of rotating multi-beam airborne LiDAR simulation with
+incremental sweep-level quality assessment. The flight model, ray casting and
+assessment run together; metric rows and warnings become available during
+acquisition without requiring the complete mission point cloud.
 
----
+## Requirements and setup
 
-## 🧭 Overview
+- Unity **2022.3.62f2c1**, as recorded in `ProjectSettings/ProjectVersion.txt`.
+- Git LFS for the existing model, texture, prefab and Unity asset files.
+- Package versions are recorded in `Packages/manifest.json` and
+  `Packages/packages-lock.json`.
 
-This project simulates a **VLP-16-equivalent rotating multi-beam LiDAR** mounted on a
-low-altitude UAV flying an automatic **S-pattern (boustrophedon) survey**.
+```sh
+git lfs install
+git clone https://github.com/MajestyHenius/AirborneStreaming.git
+cd AirborneStreaming
+git lfs pull
+```
 
-Unlike offline simulators that buffer everything and save after the mission, this one
-**streams the point cloud and writes quality metrics row-by-row during flight**, with a
-**constant memory footprint** and **sub-millisecond per-sweep assessment latency**.
+Open the project with Unity Hub. Open one of these scenes directly from `Assets/Scenes`:
 
-> Designed for UAV-LiDAR algorithm prototyping, pre-flight validation, and real-time
-> data-quality feedback.
+| Scene | Use |
+| --- | --- |
+| `RAMIS_HET51.unity` | HET51 forest survey |
+| `RAMIS_HET09.unity` | HET09 forest survey |
+| `RAMIS_HOM24.unity` | HOM24 forest survey |
+| `PerlinTerrainHET51.unity` | Seeded, bare Perlin terrain, generated at runtime |
 
----
+In the three forest scenes, the active `c-172` object runs
+`SPatternScanFlightPhased`; its `qualityAssessor` points to
+`StreamingQualityAssessment`. Press **Play** to start the survey. Point-cloud
+display is disabled in these saved configurations; a black Game view does not
+mean that scanning has stopped. Use the Scene view or the generated metric CSV
+to inspect progress. Stop Play mode after the flight reports completion.
 
-## 🔭 1. Simulation Principle
+## Scanner and flight model
 
-- **Rotating multi-beam emission:** 16 beams over a 30° along-track fan, rotated about the
-  flight axis at 10 Hz; only the ground-facing half-revolution (`|ω| ≤ 75°` from nadir) fires.
-- **Native pulse rate:** 50 Hz FixedUpdate × 360 firings/step = 18 kHz, i.e. ~28,800 pts/rev,
-  matching the real VLP-16 (`ω/f = 0.2°/firing`).
-- **Sub-stepped raycasting:** platform pose is linearly interpolated within each physics step
-  so fast rotation is sampled correctly via `Physics.Raycast`.
-- **Platform-motion model:** along-track acceleration and Gaussian vibration (cross-track /
-  vertical) can be enabled to study their effect on point-cloud quality.
+The scanner is an idealised configuration based on the VLP-16. Sixteen channel
+directions share each firing-group pose and rotation phase. Their centres use
+the equal-sector convention within a 30-degree fan; the implementation does not
+apply individual sensor calibration or inter-channel firing delays.
 
----
+The rigid-body flight is sampled by substep pose interpolation. At a 0.02 s
+physics step, 360 firing groups per step give 18,000 groups/s. With 16 channels
+and 10 revolutions/s, this represents **28,800 nominal channel-firing
+opportunities per revolution**, not 28,800 valid returns. The 100 m ray range,
+89-degree ground-facing gate and first ray-surface intersection determine the
+valid returns. A sweep is indexed by a full revolution; its ground-facing
+interval contributes the returns used for assessment.
 
-## 🧱 2. Core Components
+The three forest scenes use the following saved configuration:
 
-| Script                            | Role                                                         | Key Methods                                                  |
-| --------------------------------- | ------------------------------------------------------------ | ------------------------------------------------------------ |
-| **SPatternScanFlightPhased.cs**   | UAV flight control, S-pattern trajectory, beam geometry, raycasting, point-cloud export | `PerformScanSubstepped()`, `ExecuteStraightFlight()`, `ExecuteTurning()` |
-| **StreamingQualityAssessment.cs** | Streaming sweep-level quality metrics (ring-buffer, incremental, constant memory) | `OnFiring()`, `CommitCurrentSweep()`, `ComputeSweepCCI()`    |
+| Setting | Value |
+| --- | --- |
+| Channels / along-track fan | 16 / 30 degrees |
+| Rotation / range / angular gate | 10 Hz / 100 m / 89 degrees |
+| Physics step / firing groups per step | 0.02 s / 360 |
+| Initial height above the reference plane | 50 m |
+| Initial / accelerated speed | 5 / 15 m/s |
+| Along-track acceleration | 2 m/s² |
+| Strip count / length / spacing | 5 / 300 m / 60 m |
+| Turn radius / lift multiplier | 30 m / 1.05 |
+| Bank limit / bank smoothing | 30 degrees / 2 |
+| Velocity-perturbation standard deviation / seed | 0 m/s / 1 |
+| Assessment window / cross-track bins | 50 sweeps / 4 |
+| PDVR / ISC / CCI warning thresholds | 0.10 / 0.15 / 0.60 |
+| Independent expected counts | `useAbsoluteExpectation = true` |
+| CCI diagnostic masks | `testDropoutFraction = 0`, `testDropBin = -1` |
 
----
+When velocity perturbations are enabled, Gaussian increments are drawn at each
+physics update. Keep the physics step and seed with the configuration when
+comparing runs. Only one scanner component should be enabled on a flight object.
 
-## 🌲 3. Scene Setup (RAMI / LESS terrain)
+## Quality assessment
 
-Scenes are built from **RAMI / LESS** forest reconstructions (e.g. `HET09_JBS_SUM`) by Qi et al. from https://lessrt.org/res_html/rami.html and
-prepared for raycast-only scanning. Both are Editor tools.
+`StreamingQualityAssessment.OnFiring()` accumulates returns and commits a sweep
+at the end of its ground-facing interval. The current sweep path computes:
 
-| Script                  | Role                                                         | Entry point                                            |
-| ----------------------- | ------------------------------------------------------------ | ------------------------------------------------------ |
-| **RAMISceneBuilder.cs** | Instantiate OBJ objects from `objects.txt` + `instances.txt`, convert LESS (X,Y,Z, Z-up) → Unity (X,Z,Y, Y-up), auto-align ground to `y=0`, optional GPU instancing | Menu `RAMI ▸ Build Scene from LESS`                    |
-| **RamiSceneTiler.cs**   | Detect a single patch's XZ extent and tile the prefab into a large `tilesAlongX × tilesAlongZ` scene | Inspector buttons `Auto Detect Extent` / `Build Tiles` |
+- **PDVR:** the window mean of relative changes in adjacent sweep densities.
+  Density uses valid-return count divided by nominal strip width and the
+  horizontal displacement between sweep centroids.
+- **ISC:** the coefficient of variation of those inter-sweep displacements.
+- **CCI:** a valid-to-expected return ratio weighted by cross-track consistency.
+  Expected counts come from channel geometry, reference-plane height and range,
+  independently of observed returns. Eligible returns can come from foliage or
+  other surfaces. CCI describes nominal-ray return completeness; it does not
+  record which surface cells are occupied or measure ground visibility through
+  vegetation.
 
-Typical workflow:
+The supplied scenes enable the independent-expectation CCI branch. The older
+normalised-expectation and scan-line interfaces remain in the source for
+compatibility; they are not the configuration of these scenes. Keep the
+assessor's range and fan parameters consistent with the scanner.
 
-1. Put the RAMI parameter files under `Assets/RAMI/<scene>/Parameters/`.
-2. **RAMISceneBuilder** → *Build Scene from LESS* to instantiate the patch.
-3. *Convert to Colliders* — removes MeshRenderers and adds MeshColliders so
-   `Physics.Raycast` hits the geometry (rendering not needed for scanning; also avoids the
-   PhysX Fast-Midphase crash on >2²¹-triangle meshes).
-4. Save the result as a prefab, assign it to **RamiSceneTiler**, *Auto Detect Extent* →
-   *Build Tiles* to cover the full survey area.
+The assessment maintains window summaries and cross-track accumulators,
+requiring O(W + Q) state. Point-cloud export, range export, trajectory recording
+and visualisation have separate storage lifecycles. In particular, enabling
+point-cloud export retains text for later writing; it does not provide bounded
+memory for the full application.
 
----
+## Outputs and timing
 
-## 📐 4. Parameters
+Normal survey outputs are written under `PointClouds/<sessionId>/`:
 
-### LiDAR (`SPatternScanFlightPhased`)
+| Output | Contents |
+| --- | --- |
+| `QualityMetrics_*.csv` | Sweep index, simulated timestamp, PDVR, ISC, CCI, warning, phase, return count and density |
+| `QualitySummary_*.txt` | Aggregate metric and threshold statistics |
+| `Performance_*.csv` | Legacy per-physics-step scan/assessment samples and managed-memory samples |
+| `SPattern_Trajectory_*.txt` | Recorded Unity position, rotation and time, when trajectory recording is enabled |
+| `SPattern_PointCloud_*.txt`, `SPattern_RangeMatrix_*.txt` | Optional buffered exports |
 
-| Parameter               | Description                  | Default |
-| ----------------------- | ---------------------------- | ------- |
-| `lines`                 | Beam/channel count           | 16      |
-| `verticalFOV`           | Along-track fan angle Θ (°)  | 30      |
-| `maxDetectionDistance`  | Max range (m)                | 100     |
-| `rotationFrequency`     | Scanner rotation (Hz)        | 10      |
-| `maxScanAngleFromNadir` | Ground-facing half-angle (°) | 75      |
-| `firingsPerFixedUpdate` | Firings per physics step     | 360     |
+For explicit wall-clock timing, enable `enableSweepTiming` on the assessor
+while using `SPatternScanFlightPhased`. `SweepTimingRecorder` writes
+`PointClouds/TimingDiagnostics/<run>/SweepTiming.csv` using a monotonic
+`Stopwatch` clock. It distinguishes:
 
-### Flight
+- simulated collection interval;
+- wall time from the first firing to computed metrics and warning;
+- sweep-commit computation;
+- accumulated firing-assessment plus commit computation.
 
-| Parameter                     | Description                         | Default  |
-| ----------------------------- | ----------------------------------- | -------- |
-| `targetHeight`                | AGL altitude (m)                    | 50       |
-| `cruiseSpeed`                 | Cruise speed (m/s)                  | 5        |
-| `swathWidth` / `swathLength`  | Line spacing / length (m)           | 20 / 400 |
-| `numberOfSwaths`              | Number of survey lines              | 5        |
-| `turnRadius` / `maxBankAngle` | Turn radius (m) / bank limit (°)    | 30 / 30  |
-| `cruiseAcceleration`          | Along-track accel a (m/s², 0 = off) | 0        |
-| `vibrationSigma`              | Vibration σ_v (m/s, 0 = off)        | 0        |
+The computed-result endpoint precedes result writing. These fields have different
+meanings from `Performance_*.csv` and should not be used interchangeably.
 
-### Quality Metrics (`StreamingQualityAssessment`)
+## Terrain and auxiliary scripts
 
-| Parameter       | Description                   | Default |
-| --------------- | ----------------------------- | ------- |
-| `WindowSize`    | Sliding window W (sweeps)     | 50      |
-| `PDVRThreshold` | Point density variation alert | 0.10    |
-| `ISCThreshold`  | Inter-sweep spacing alert     | 0.15    |
-| `CCIThreshold`  | Coverage completeness alert   | 0.60    |
-| `CCIBinCount`   | Cross-track bins Q            | 4       |
+The bare-terrain scene uses `TerrainGenerator` through
+`PerlinTerrainExperiment`: 420 m × 420 m, a 513 × 513 height map, seed 42,
+20 m relief, noise scale 4, three octaves, persistence 0.5 and lacunarity 2.
+The mean terrain elevation is translated to zero. The same phased flight and
+scanner are used, with no trees. This scene records its height map, poses,
+returns and a configuration manifest under `PointClouds/`.
 
----
+`SPatternScanFlightPhasedLoop` provides repeated survey legs for long runs.
+It is disabled in the forest scenes; its flight settings must be configured
+explicitly before use. `CruiseScanner`, `AccelScanner`, `BankingScanner` and
+older flight components are auxiliary examples with their own Inspector values.
+They do not replace the three saved full-survey configurations above.
 
-## 📊 5. Quality Metrics
+`RAMISceneBuilder` (`RAMI > Build Scene from LESS`) and `RamiSceneTiler`
+prepare and tile forest geometry. RAMI/LESS source information is available
+from [LESS](https://lessrt.org/res_html/rami.html). Existing model and third-party
+asset attributions remain with their files.
 
-Three complementary metrics are computed incrementally, one value per ground-facing sweep:
+## Repository contents
 
-| Metric   | Meaning                                                      | Flag when |
-| -------- | ------------------------------------------------------------ | --------- |
-| **PDVR** | Point Density Variation Rate between consecutive sweeps      | `> 0.10`  |
-| **ISC**  | Inter-Sweep spacing Consistency (CV of sweep spacing)        | `> 0.15`  |
-| **CCI**  | Coverage Completeness Index (actual / expected per cross-track bin × uniformity) | `< 0.60`  |
+This repository contains application source, saved scenes, required assets and
+project/package settings. Generated point clouds, output archives, local
+diagnostic runners, temporary scenes and manuscript working notes are excluded.
+Ordinary implementation comments are retained. Generated results belong outside
+version control; the project `.gitignore` covers the standard output locations.
 
-### Controlled single-effect experiments
-
-To isolate how each platform motion affects the metrics, three minimal scanners reuse the
-**exact same scan kernel** as the full S-pattern but replace the trajectory with one clean motion:
-
-| Script                | Motion                                             | Tests                                                  |
-| --------------------- | -------------------------------------------------- | ------------------------------------------------------ |
-| **CruiseScanner.cs**  | Constant-velocity straight line                    | Steady-state baseline (PDVR ≈ 0, low ISC, CCI ≈ const) |
-| **AccelScanner.cs**   | Constant along-track acceleration                  | PDVR response to density drift (`(1/D)(dD/dt) = −a/v`) |
-| **BankingScanner.cs** | Straight → single 180° coordinated turn → straight | CCI drop / ISC rise during banked turn                 |
-
-Each writes the same metric CSV with a `Phase` column (`Cruise` / `Accel` / `Straight` /
-`Turning`) so the effect is directly traceable in the output.
-
----
-
-## 💾 6. Data Output
-
-All files are written to `/PointClouds/<sessionId>/` (`sessionId` = `yyyyMMdd_HHmmss`).
-
-| File                            | Content                                                      |
-| ------------------------------- | ------------------------------------------------------------ |
-| `QualityMetrics_<id>.csv`       | Per-sweep `ScanIndex,Timestamp,PDVR,ISC,CCI,Warning,Phase,Pi,RhoI` |
-| `QualitySummary_<id>.txt`       | Aggregate mean / max / threshold-exceedance summary          |
-| `Performance_<id>.csv`          | Per-step `Step,Timestamp,ScanMs,MetricMs,MemMB` (latency & memory) |
-| `SPattern_PointCloud_<id>.txt`  | `x y z range intensity scan_angle` (if `savePointCloud`)     |
-| `SPattern_RangeMatrix_<id>.txt` | Per-scan range rows (if `saveRangeMatrix`)                   |
-| `SPattern_Trajectory_<id>.txt`  | Per-step platform pose `s_t` (if `saveTrajectory`)           |
-
-> For performance/time-series runs, set `savePointCloud` / `saveRangeMatrix` /
-> `enablePointDisplay` to **false** to keep memory constant.
-
----
-
-## 🚀 7. Usage
-
-1. Open the scene in Unity `2022.3.62f` and build the terrain (see Section 3).
-2. Attach `SPatternScanFlightPhased` to the UAV object and `StreamingQualityAssessment`
-   to any object, then assign the latter to the `qualityAssessor` field.
-3. Set LiDAR / flight / metric parameters in the Inspector.
-4. Press **Play** — scanning starts automatically; metrics stream live and a quality
-   panel renders the point cloud.
-5. The flight stops at the last swath; all CSV/TXT outputs are saved automatically.
-
-> For the controlled experiments, use `CruiseScanner` / `AccelScanner` / `BankingScanner`
-> instead of `SPatternScanFlightPhased` (same setup, single motion).
-
----
-
-## 📈 8. Visualization & Analysis
-
-- Import `*_PointCloud_*.txt` into **CloudCompare**, **Open3D**, or **MATLAB**.
-- Plot `QualityMetrics_*.csv` to inspect PDVR / ISC / CCI over the flight.
-- Use `Performance_*.csv` to verify constant memory and sub-ms metric latency.
-
----
-
-## 🧩 9. Future Work
-
-- Reflectivity / noise modeling
-- PLY / PCD export
-- Additional flight patterns and terrain loaders
-
----
-
-## 📜 License
-
-Released under the **MIT License**. Free for research and educational use with attribution.
-
-
-
----
-
-## 🇨🇳 中文简介
-
-基于 Unity 的机载旋转多线束 LiDAR 仿真器(VLP-16 等效),无人机自动执行 S 型航线扫描,
-地形来自 RAMI / LESS 森林重建场景。**飞行过程中实时流式生成点云并逐行计算扫描质量指标
-(PDVR / ISC / CCI)**,内存占用恒定,单 sweep 评估延迟亚毫秒。另附 Accel / Banking/  Cruise 
-三个受控实验脚本,分别隔离匀速、加速、转弯对点云质量的影响。可用于 UAV-LiDAR 算法原型验证、
-飞行前测试与实时质量反馈。
+Project code is released under the [MIT License](LICENSE). Third-party assets
+retain their accompanying licenses and notices.

@@ -19,6 +19,26 @@ using System;
 /// </summary>
 public class CruiseScanner : MonoBehaviour
 {
+    // Opt-in observer for metric experiments. Buffers are valid only during the callback.
+    // Normal scene runs never enable this mode and keep their existing output lifecycle.
+    public event Action<float, Vector3, Quaternion, float, List<float>, Vector3[], bool[]> ComparisonFiring;
+    private bool comparisonMode;
+    private float comparisonEpoch;
+    public void ConfigureComparison(float height, float speed, float length)
+    {
+        comparisonMode = true;
+        targetHeight = height; cruiseSpeed = speed; flightLength = length;
+        lines = 16; verticalFOV = 30; maxDetectionDistance = 100;
+        rotationFrequency = 10; maxScanAngleFromNadir = 89;
+        initialRotationPhase = -180; firingsPerFixedUpdate = 360;
+        qualityAssessor = null; savePointCloud = false; saveRangeMatrix = false;
+    }
+    public void StopComparison()
+    {
+        if (!comparisonMode) return;
+        isScanning = false; isCompleted = true;
+        if (rb != null) rb.velocity = Vector3.zero;
+    }
     [Header("===== LiDAR (VLP-16 等效, 同 tab:scanner) =====")]
     [SerializeField] private int lines = 16;
     [SerializeField] private float verticalFOV = 30f;
@@ -26,7 +46,7 @@ public class CruiseScanner : MonoBehaviour
 
     [Header("===== 旋转扫描 =====")]
     [SerializeField] private float rotationFrequency = 10f;
-    [SerializeField] private float maxScanAngleFromNadir = 75f;
+    [SerializeField] private float maxScanAngleFromNadir = 89f;
     [SerializeField] private float initialRotationPhase = 0f;
     [SerializeField] private int firingsPerFixedUpdate = 360;
     [SerializeField] private StreamingQualityAssessment qualityAssessor;
@@ -38,7 +58,7 @@ public class CruiseScanner : MonoBehaviour
 
     [Header("===== 输出 =====")]
     [SerializeField] private string outputPrefix = "Cruise";
-    [SerializeField] private bool savePointCloud = false;  // off: metrics only, constant memory
+    [SerializeField] private bool savePointCloud = false;  // Disable point-cloud text export.
     [SerializeField] private bool saveRangeMatrix = false;  // off by default; metrics dont need it
 
     // ---- internal ----
@@ -79,6 +99,7 @@ public class CruiseScanner : MonoBehaviour
 
     void Start()
     {
+        comparisonEpoch = Time.fixedTime;
         sessionId = DateTime.Now.ToString("yyyyMMdd_HHmmss");
 
         rb = GetComponent<Rigidbody>();
@@ -99,6 +120,8 @@ public class CruiseScanner : MonoBehaviour
             qualityAssessor.CurrentPhase = "Cruise";
         }
 
+        if (!comparisonMode)
+        {
         outputDirCached = Path.Combine(Application.dataPath, "..", "PointClouds", sessionId + "_" + outputPrefix);
         if (!Directory.Exists(outputDirCached)) Directory.CreateDirectory(outputDirCached);
         if (savePointCloud)
@@ -106,6 +129,7 @@ public class CruiseScanner : MonoBehaviour
         trajWriter = new StreamWriter(Path.Combine(outputDirCached, $"{outputPrefix}_Trajectory_{sessionId}.txt"));
         if (qualityAssessor != null) qualityAssessor.OpenMetricsStream(outputDirCached);
         trajectoryData.AppendLine("# t px py pz qx qy qz qw");
+        }
         isScanning = true;
         Debug.Log($"[Cruise] start, v={cruiseSpeed} h={targetHeight} len={flightLength}");
     }
@@ -125,6 +149,7 @@ public class CruiseScanner : MonoBehaviour
 
     float ComputeOmegaAt(float t)
     {
+        if (comparisonMode) t -= comparisonEpoch;
         float raw = 2f * Mathf.PI * rotationFrequency * t + initialRotationPhase * Mathf.Deg2Rad;
         return Mathf.Repeat(raw + Mathf.PI, 2f * Mathf.PI) - Mathf.PI;
     }
@@ -158,7 +183,7 @@ public class CruiseScanner : MonoBehaviour
 
         PerformScanSubstepped();
         if (++flushCounter >= 50) { flushCounter = 0; pcWriter?.Flush(); trajWriter?.Flush(); }
-        RecordTrajectorySample();
+        if (!comparisonMode) RecordTrajectorySample();
 
         prevScanPosition = transform.position;
         prevScanRotation = transform.rotation;
@@ -187,6 +212,7 @@ public class CruiseScanner : MonoBehaviour
 
         for (int k = 0; k < N; k++)
         {
+            if (comparisonMode && !isScanning) break;
             float u = (k + 1f) / N;
             float tSub = t0 + u * dt;
             float omega = ComputeOmegaAt(tSub);
@@ -211,7 +237,7 @@ public class CruiseScanner : MonoBehaviour
                     float range = hasHit ? hit.distance : -1f;
                     currentScanRanges.Add(range);
 
-                    if (k == N - 1)
+                    if (k == N - 1 || comparisonMode)
                     {
                         lastScanOrigins[i] = scanPosition;
                         lastScanHasHit[i] = hasHit;
@@ -234,6 +260,9 @@ public class CruiseScanner : MonoBehaviour
 
             if (qualityAssessor != null)
                 qualityAssessor.OnFiring(currentScanRanges, scanPosition, omega);
+            if (comparisonMode)
+                ComparisonFiring?.Invoke(tSub - comparisonEpoch, scanPosition, scanRotation, omega,
+                    currentScanRanges, lastScanHitPoints, lastScanHasHit);
         }
     }
 
@@ -258,6 +287,7 @@ public class CruiseScanner : MonoBehaviour
 
     void OnApplicationQuit()
     {
+        if (comparisonMode) return;
         if (totalPointsCollected > 0 && !isCompleted) SaveScanData();
     }
 

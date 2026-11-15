@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using UnityEngine;
 using System.IO;
 using System.Text;
@@ -101,7 +101,7 @@ public class LineFlightScanner : MonoBehaviour
         totalDistance = dirVec.magnitude;
         flightDirection = dirVec.normalized;
 
-        // === FIX: 加上和 SPattern 一致的模型修正,
+        // 与 SPattern 一致的模型朝向修正:
         //         否则 LiDAR 本地 X/Z 轴被调换,扫描方向会跟航向重合 ===
         transform.rotation = BuildPlatformRotation(flightDirection);
 
@@ -169,7 +169,7 @@ public class LineFlightScanner : MonoBehaviour
         // 匀速直线推进,姿态恒定
         rb.velocity = flightDirection * cruiseSpeed;
 
-        // === FIX: 用同样的修正,保持姿态稳定且与 SPattern 一致 ===
+        // 保持姿态稳定并采用与 SPattern 一致的模型朝向修正。
         transform.rotation = BuildPlatformRotation(flightDirection);
 
         // 检查是否到达终点
